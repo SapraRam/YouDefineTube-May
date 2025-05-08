@@ -1,0 +1,785 @@
+/* Hide the main feed grid ONLY on the homepage */
+ytd-browse[page-subtype="home"] #primary > ytd-rich-grid-renderer {
+    display: none !important;
+}
+
+/* Styles for the no-topics message container */
+#youdefine-no-topics-message::before {
+    content: "Try searching to get started\A Start watching videos to help us build a feed of videos you'll love.";
+    white-space: pre-wrap;
+    display: block;
+    padding: 24px;
+    margin: 20px auto;
+    max-width: 600px;
+    text-align: center;
+    background-color: #212121;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    color: #ffffff;
+    font-size: 16px;
+    line-height: 1.5;
+    font-family: 'Roboto', Arial, sans-serif;
+    font-weight: 400;
+}
+
+/* Hide message when topics are present */
+body.has-topics #youdefine-no-topics-message::before {
+    display: none !important;
+}
+
+/* More aggressive scrollbar removal ONLY on homepage */
+ytd-browse[page-subtype="home"],
+ytd-browse[page-subtype="home"] #primary,
+ytd-browse[page-subtype="home"] ytd-two-column-browse-results-renderer,
+ytd-browse[page-subtype="home"] #contents.ytd-rich-grid-renderer {
+    overflow: hidden !important;
+}
+
+/* Fix for ensuring only the sidebar is scrollable */
+ytd-app {
+    height: 100% !important;
+    overflow: visible !important;
+}
+
+/* Target only the homepage for overflow hidden */
+ytd-app[page-subtype="home"] {
+    overflow: hidden !important;
+}
+
+/* Ensure video page scrolling works properly */
+ytd-watch-flexy {
+    overflow-y: auto !important;
+}
+
+/* Ensure content area is hidden properly only on homepage */
+ytd-page-manager ytd-browse[page-subtype="home"] {
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
+}
+
+/* Make sure the guide/sidebar is scrollable */
+#guide-content,
+#guide-inner-content {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - 56px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+/* Ensure guide sections are visible and properly scrollable */
+ytd-guide-section-renderer {
+    overflow: visible !important;
+    display: block !important;
+}
+
+/* Keep rules ensuring masthead/guide are visible */
+#masthead-container,
+ytd-masthead,
+ytd-guide-renderer,
+ytd-mini-guide-renderer,
+#guide-content,
+#guide-inner-content,
+ytd-guide-section-renderer,
+ytd-guide-entry-renderer {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* YouDefineTube Button Styles - Material UI Theme */
+#youdefine-button {
+    background-color: #cc0000;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    height: 36px;
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    margin-right: 24px;
+    margin-left: auto;
+    font-family: 'Roboto', Arial, sans-serif;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    position: relative;
+    z-index: 2001;
+}
+
+#youdefine-button:hover {
+    background-color: #990000;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+#youdefine-button:focus {
+    outline: none;
+}
+
+#youdefine-button img {
+    height: 20px;
+    width: 20px;
+    margin-right: 8px;
+}
+
+/* Dark mode support for the button */
+html[dark] #youdefine-button {
+    background-color: #282828;
+    color: white;
+}
+
+html[dark] #youdefine-button:hover {
+    background-color: #3f3f3f;
+}
+
+/* YouDefineTube Panel Styles */
+#youdefine-panel {
+    position: fixed;
+    top: 56px;
+    right: 100px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    width: 320px;
+    z-index: 2100;
+    padding: 16px;
+    display: none;
+    font-family: 'Roboto', Arial, sans-serif;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: top right;
+    transform: scale(0.95);
+    opacity: 0;
+    max-height: calc(100vh - 70px);
+    overflow-y: auto;
+}
+
+#youdefine-panel.visible {
+    display: block;
+    transform: scale(1);
+    opacity: 1;
+}
+
+/* Dark mode support for the panel */
+html[dark] #youdefine-panel {
+    background-color: #212121;
+    color: #e0e0e0;
+}
+
+html[dark] #youdefine-panel h2,
+html[dark] #youdefine-panel h3 {
+    color: #ff5252;
+}
+
+#youdefine-panel h2 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    color: #cc0000;
+    font-size: 18px;
+    font-weight: 500;
+}
+
+#youdefine-panel .message {
+    background-color: #f8f8f8;
+    border-left: 4px solid #cc0000;
+    padding: 10px;
+    margin: 12px 0;
+    font-size: 13px;
+}
+
+/* Dark mode support for the message */
+html[dark] #youdefine-panel .message {
+    background-color: #303030;
+    border-left: 4px solid #ff5252;
+}
+
+#youdefine-panel button {
+    background-color: #cc0000;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-top: 4px;
+    font-size: 13px;
+    text-transform: uppercase;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    transition: background-color 0.2s;
+}
+
+#youdefine-panel button:hover {
+    background-color: #990000;
+}
+
+/* Dark mode support for buttons */
+html[dark] #youdefine-panel button {
+    background-color: #ff5252;
+}
+
+html[dark] #youdefine-panel button:hover {
+    background-color: #ff3d3d;
+}
+
+#youdefine-panel .toggle-container {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(0,0,0,0.1);
+}
+
+/* Dark mode for dividers */
+html[dark] #youdefine-panel .toggle-container {
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+#youdefine-panel .toggle-container h3 {
+    font-size: 15px;
+    margin: 0 0 10px 0;
+    font-weight: 500;
+}
+
+/* Material Design Switch/Toggle */
+#youdefine-panel .toggle-option {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+#youdefine-panel .toggle-option input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+#youdefine-panel .toggle-option label {
+    margin-left: 52px;
+    font-size: 14px;
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+#youdefine-panel .toggle-option label:before {
+    content: '';
+    position: absolute;
+    left: -52px;
+    width: 36px;
+    height: 14px;
+    background-color: #bdbdbd;
+    border-radius: 14px;
+    transition: background-color 0.3s;
+}
+
+#youdefine-panel .toggle-option label:after {
+    content: '';
+    position: absolute;
+    left: -52px;
+    width: 20px;
+    height: 20px;
+    background-color: #f5f5f5;
+    border-radius: 50%;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s;
+}
+
+#youdefine-panel .toggle-option input:checked + label:before {
+    background-color: rgba(204, 0, 0, 0.5);
+}
+
+#youdefine-panel .toggle-option input:checked + label:after {
+    left: -30px;
+    background-color: #cc0000;
+}
+
+/* Dark mode for toggles */
+html[dark] #youdefine-panel .toggle-option label:before {
+    background-color: #555;
+}
+
+html[dark] #youdefine-panel .toggle-option label:after {
+    background-color: #757575;
+}
+
+html[dark] #youdefine-panel .toggle-option input:checked + label:before {
+    background-color: rgba(255, 82, 82, 0.5);
+}
+
+html[dark] #youdefine-panel .toggle-option input:checked + label:after {
+    background-color: #ff5252;
+}
+
+/* Radio button styles for shorts options */
+#youdefine-panel .radio-option {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+}
+
+#youdefine-panel .radio-option input[type="radio"] {
+    margin-right: 8px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #bdbdbd;
+    border-radius: 50%;
+    outline: none;
+    transition: all 0.2s;
+    position: relative;
+    cursor: pointer;
+}
+
+#youdefine-panel .radio-option input[type="radio"]:checked {
+    border-color: #cc0000;
+}
+
+#youdefine-panel .radio-option input[type="radio"]:checked::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #cc0000;
+}
+
+#youdefine-panel .radio-option label {
+    font-size: 13px;
+    cursor: pointer;
+}
+
+/* Dark mode for radio buttons */
+html[dark] #youdefine-panel .radio-option input[type="radio"] {
+    border-color: #555;
+}
+
+html[dark] #youdefine-panel .radio-option input[type="radio"]:checked {
+    border-color: #ff5252;
+}
+
+html[dark] #youdefine-panel .radio-option input[type="radio"]:checked::after {
+    background-color: #ff5252;
+}
+
+/* Styles for the topic input field on the homepage */
+.youdefine-topic-input-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 72px; /* Account for masthead height */
+    padding: 0 24px;
+}
+
+.youdefine-topic-input-container .input-wrapper {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: 600px;
+    background-color: #212121;
+    border: 1px solid #2c2c2c;
+    border-radius: 24px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    overflow: hidden;
+}
+
+.youdefine-topic-input-container input[type="text"] {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    background: transparent;
+    color: #e0e0e0;
+    font-size: 16px;
+    font-family: 'Roboto', Arial, sans-serif;
+    outline: none;
+}
+
+.youdefine-topic-input-container input[type="text"]::placeholder {
+    color: #888;
+}
+
+.youdefine-topic-input-container input[type="text"]:focus {
+    outline: none;
+}
+
+.youdefine-topic-input-container button {
+    background-color: #cc0000;
+    border: none;
+    padding: 12px;
+    cursor: pointer;
+    border-radius: 0 24px 24px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+
+.youdefine-topic-input-container button:hover {
+    background-color: #990000;
+}
+
+.youdefine-topic-input-container button svg {
+    width: 20px;
+    height: 20px;
+    stroke: #ffffff;
+}
+
+/* Dark mode support for input field */
+html[dark] .youdefine-topic-input-container .input-wrapper {
+    background-color: #212121;
+    border: 1px solid #2c2c2c;
+}
+
+html[dark] .youdefine-topic-input-container input[type="text"] {
+    color: #e0e0e0;
+}
+
+html[dark] .youdefine-topic-input-container input[type="text"]::placeholder {
+    color: #888;
+}
+
+/* Error state for input */
+.youdefine-topic-input-container input[type="text"][style*="border-color: rgb(255, 0, 0)"] {
+    border: none !important;
+    background-color: rgba(255, 0, 0, 0.1);
+}
+
+/* Dark mode for error state */
+html[dark] .youdefine-topic-input-container input[type="text"][style*="border-color: rgb(255, 0, 0)"] {
+    background-color: rgba(255, 82, 82, 0.1);
+}
+
+/* Animation for empty input validation */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.shake-animation {
+    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+/* Shorts blocking overlay */
+.youdefine-shorts-blocked {
+    position: relative;
+    overflow: hidden;
+}
+
+.youdefine-shorts-blocked::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 10;
+}
+
+.youdefine-shorts-blocked::after {
+    content: 'Short blocked by YouDefineTube';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-weight: 500;
+    z-index: 11;
+    background-color: rgba(204, 0, 0, 0.8);
+    padding: 8px 16px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+/* Strong rule for hiding Shorts in the navigation */
+.youdefine-hide-shorts-nav ytd-guide-entry-renderer a[href^="/shorts"],
+.youdefine-hide-shorts-nav ytd-mini-guide-entry-renderer a[href^="/shorts"],
+.youdefine-hide-shorts-nav a#endpoint[title="Shorts"],
+.youdefine-hide-shorts-nav a[href^="/shorts"],
+.youdefine-hide-shorts-nav [aria-label="Shorts"],
+.youdefine-hide-shorts-nav #endpoint[href^="/shorts"],
+.youdefine-hide-shorts-nav ytd-guide-entry-renderer #endpoint[href^="/shorts"],
+body.youdefine-hide-shorts a#endpoint[title="Shorts"],
+.badge-shape-wiz, .badge-shape-wiz--thumbnail-default, .badge-shape-wiz--thumbnail-badge {
+    display: none !important;
+}
+
+/* More specific targeting for homepage shorts section by ID */
+.youdefine-hide-shorts-nav ytd-rich-section-renderer #shorts,
+.youdefine-hide-shorts-nav ytd-rich-section-renderer[is-shorts],
+.youdefine-hide-shorts-nav ytd-rich-item-renderer[is-shorts],
+.youdefine-hide-shorts-nav ytd-rich-shelf-renderer[is-shorts],
+.youdefine-hide-shorts-nav #endpoint[href^="/shorts"] {
+    display: none !important;
+}
+
+.youdefine-hide-shorts-nav ytd-guide-entry-renderer:has(a[href^="/shorts"]),
+.youdefine-hide-shorts-nav ytd-mini-guide-entry-renderer:has(a[href^="/shorts"]),
+.youdefine-hide-shorts-nav ytd-guide-entry-renderer:has(#endpoint[href^="/shorts"]) {
+    display: none !important;
+}
+
+/* Target navigation items by position as well (common for Shorts being 2nd item) */
+.youdefine-hide-shorts-nav #sections > ytd-guide-section-renderer:first-child #items > ytd-guide-entry-renderer:nth-child(2) {
+    display: none !important;
+}
+
+/* Animation keyframes for topic nav appearance */
+@keyframes fadeSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Animation for chip hover - removed scaling animation to avoid conflicts */
+@keyframes chipHover {
+    0% {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    100% {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+}
+
+/* Animation for chip click - removed scaling/pulsing to avoid infinite animation loop */
+@keyframes chipPulse {
+    0% {
+        opacity: 0.9;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* Animation for close button hover */
+@keyframes closeHover {
+    0% {
+        background-color: transparent;
+    }
+    100% {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+}
+
+/* Styles for topic chips navigation - Material UI with Black Shade */
+.youdefine-topic-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px 24px;
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #2c2c2c;
+    margin-top: 16px;
+    width: calc(100% - 48px); /* Full width minus padding */
+    max-width: none; /* Remove max-width constraint */
+    margin-left: auto;
+    margin-right: auto;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    animation: fadeSlideIn 0.5s ease-out forwards;
+    border-radius: 16px; /* Rounded corners */
+}
+
+/* Dark mode for topic nav (already dark, but ensure consistency) */
+html[dark] .youdefine-topic-nav {
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #2c2c2c;
+}
+
+.youdefine-topic-chip {
+    display: inline-flex;
+    align-items: center;
+    background-color: #2c2c2c;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #e0e0e0;
+    cursor: pointer;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    font-family: 'Roboto', Arial, sans-serif;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    position: relative;
+    will-change: transform, box-shadow;
+}
+
+.youdefine-topic-chip .chip-name {
+    margin-right: 8px;
+}
+
+.youdefine-topic-chip .chip-close {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 18px;
+    height: 18px;
+    font-size: 16px;
+    color: #e0e0e0;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.youdefine-topic-chip .chip-close:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Dark mode for topic chips */
+html[dark] .youdefine-topic-chip {
+    background-color: #2c2c2c;
+    color: #e0e0e0;
+}
+
+.youdefine-topic-chip:hover {
+    background-color: #3c3c3c;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+/* Dark mode for chip hover */
+html[dark] .youdefine-topic-chip:hover {
+    background-color: #3c3c3c;
+}
+
+.youdefine-topic-chip.active-chip {
+    background-color: #cc0000;
+    color: #ffffff;
+    /* Single-time animation that doesn't cause infinite loops */
+    animation: none;
+}
+
+/* Dark mode for active chip */
+html[dark] .youdefine-topic-chip.active-chip {
+    background-color: #cc0000;
+    color: #ffffff;
+}
+
+/* Styles for converted shorts */
+.youdefine-convert-overlay {
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    text-decoration: none;
+    z-index: 2000;
+    font-family: 'Roboto', Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.youdefine-converted-short {
+    position: relative;
+}
+
+.youdefine-converted-short::before {
+    content: 'Converted Short';
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background-color: rgba(204, 0, 0, 0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* Dark mode support */
+html[dark] .youdefine-converted-short::before {
+    background-color: rgba(255, 82, 82, 0.8);
+}
+
+/* Hide specific classes for shorts elements */
+.youdefine-hide-shorts-classes .yt-simple-endpoint.style-scope.ytd-guide-entry-renderer[href^="/shorts"] {
+    display: none !important;
+}
+
+/* More aggressive targeting for Shorts in navigation */
+.youdefine-hide-shorts-classes ytd-guide-entry-renderer:has(> .yt-simple-endpoint[href^="/shorts"]),
+.youdefine-hide-shorts-classes ytd-mini-guide-entry-renderer:has(> .yt-simple-endpoint[href^="/shorts"]) {
+    display: none !important;
+}
+
+/* Handle any shorts menu items with specific classes */
+.youdefine-hide-shorts-classes ytd-guide-section-renderer ytd-guide-entry-renderer:has(yt-formatted-string:contains("Shorts")) {
+    display: none !important;
+}
+
+/* Target specific classes for shorts section headers */
+.youdefine-hide-shorts-classes .yt-simple-endpoint.ytd-section-list-renderer[href^="/shorts"],
+.youdefine-hide-shorts-classes .yt-simple-endpoint.ytd-grid-renderer[href^="/shorts"],
+.youdefine-hide-shorts-classes .yt-simple-endpoint.ytd-rich-grid-renderer[href^="/shorts"] {
+    display: none !important;
+}
+
+/* Target parent containers that have the specified classes */
+.youdefine-hide-shorts-classes ytd-rich-section-renderer:has(> #content .yt-simple-endpoint[href^="/shorts"]),
+.youdefine-hide-shorts-classes ytd-rich-section-renderer:has(> #content ytd-rich-shelf-renderer .yt-simple-endpoint[href^="/shorts"]) {
+    display: none !important;
+}
+
+/* Hide Video Sidebar (Related videos column) */
+body.youdefine-hide-sidebar ytd-watch-flexy #secondary.ytd-watch-flexy {
+    display: none !important;
+}
+
+/* Adjust primary content to take full width when sidebar is hidden */
+body.youdefine-hide-sidebar ytd-watch-flexy #primary.ytd-watch-flexy {
+    margin-right: 0 !important;
+}
+
+body.youdefine-hide-sidebar ytd-watch-flexy:not([theater]) #primary.ytd-watch-flexy {
+    padding-right: 0 !important;
+}
+
+/* Shorts navigation hiding */
+.youdefine-hide-shorts-nav ytd-guide-entry-renderer a[href^="/shorts"],
+.youdefine-hide-shorts-nav ytd-mini-guide-entry-renderer a[href^="/shorts"],
+.youdefine-hide-shorts-nav [title="Shorts"],
+.youdefine-hide-shorts-nav [aria-label="Shorts"],
+.youdefine-hide-shorts-nav a#endpoint[href^="/shorts"] {
+    display: none !important;
+}
+
+.youdefine-hide-shorts-nav ytd-guide-entry-renderer:has(a[href^="/shorts"]),
+.youdefine-hide-shorts-nav ytd-mini-guide-entry-renderer:has(a[href^="/shorts"]) {
+    display: none !important;
+}
+
+/* Hide Comments on Regular Videos */
+body.youdefine-hide-comments ytd-comments#comments,
+body.youdefine-hide-comments #comments-section {
+    display: none !important;
+}
+
+/* Hide Comments Button on Shorts */
+body.youdefine-hide-comments .ytp-shorts-comments-button,
+body.youdefine-hide-comments ytd-reel-player-overlay-renderer ytd-shorts-action-button-renderer[aria-label*="comment" i],
+body.youdefine-hide-comments ytd-reel-player-overlay-renderer [aria-label*="comment" i],
+body.youdefine-hide-comments ytd-shorts [aria-label*="comment" i],
+body.youdefine-hide-comments ytd-shorts-action-button-renderer[aria-label*="Comment" i],
+body.youdefine-hide-comments #comments-button {
+    display: none !important;
+}
+
+/* Hide Comments Panel for Shorts */
+body.youdefine-hide-comments ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-comments-section"],
+body.youdefine-hide-comments ytd-engagement-panel-section-list-renderer[target-id*="comment"],
+body.youdefine-hide-comments .ytd-shorts-engagement-panels #shorts-comments-panel,
+body.youdefine-hide-comments ytd-app #comments-engagement-panel,
+body.youdefine-hide-comments .reel-comments-panel {
+    display: none !important;
+}

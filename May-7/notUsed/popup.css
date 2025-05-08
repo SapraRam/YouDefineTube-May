@@ -1,0 +1,121 @@
+body {
+    font-family: Arial, sans-serif;
+    width: 300px;
+    padding: 15px;
+}
+
+h2 {
+    margin-top: 0;
+    color: #cc0000;
+}
+
+input[type="text"] {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+}
+
+button {
+    background-color: #cc0000;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-right: 5px;
+}
+
+button:hover {
+    background-color: #990000;
+}
+
+.toggle-container {
+    margin-top: 15px;
+}
+
+.toggle-option {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.toggle-option label {
+    margin-left: 10px;
+}
+
+.message {
+    background-color: #f8f8f8;
+    border-left: 4px solid #cc0000;
+    padding: 10px;
+    margin: 15px 0;
+    font-size: 14px;
+}
+
+.topics-container {
+    margin: 10px 0;
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 5px 0;
+}
+
+.topic-tag {
+    display: inline-flex;
+    align-items: center;
+    background-color: #f0f0f0;
+    padding: 4px 8px;
+    margin: 3px;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.topic-tag .topic-name {
+    cursor: pointer;
+}
+
+.topic-tag .remove {
+    margin-left: 5px;
+    cursor: pointer;
+    color: #cc0000;
+    font-weight: bold;
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    text-align: center;
+    line-height: 16px;
+    font-size: 14px;
+}
+
+.topic-tag .remove:hover {
+    background-color: #ffeeee;
+    border-radius: 50%;
+}
+
+.active-topic {
+    background-color: #f8d7d7;
+    border: 1px solid #cc0000;
+}
+
+/* Animation for empty input validation */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.shake-animation {
+    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+/* Error state for input */
+input[type="text"].error, input[type="text"]:focus.error {
+    border-color: #ff0000;
+    background-color: rgba(255, 0, 0, 0.03);
+}
+
+/* Improve focus state */
+input[type="text"]:focus {
+    border-color: #cc0000;
+    outline: none;
+    box-shadow: 0 0 0 1px rgba(204, 0, 0, 0.2);
+}

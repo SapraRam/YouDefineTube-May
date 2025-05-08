@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>YouDefineTube</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+  <h2>YouDefineTube</h2>
+  <p>Focus your YouTube experience on what really matters to you.</p>
+
+  <div class="message">
+    YouTube homepage feed is always hidden. Add topics below to see filtered content.
+  </div>
+
+  <label for="topic">Enter your learning topics:</label>
+  <input type="text" id="topic" placeholder="e.g., JavaScript, guitar lessons, history">
+  <button id="addTopic">Add Topic</button>
+
+  <div class="topics-container" id="topicsContainer">
+    <!-- Topics will be added here dynamically -->
+  </div>
+
+  <div class="toggle-container">
+    <h3>Display Options</h3>
+
+    <div class="toggle-option">
+      <input type="checkbox" id="hideShorts">
+      <label for="hideShorts">Hide Shorts</label>
+    </div>
+
+    <div class="toggle-option">
+      <input type="checkbox" id="hideSidebar">
+      <label for="hideSidebar">Hide Sidebar</label>
+    </div>
+
+    <div class="toggle-option">
+      <input type="checkbox" id="hideComments">
+      <label for="hideComments">Hide Comments</label>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>
