@@ -3,6 +3,7 @@
 // Track if we're on the homepage
 let isHomePage = false;
 let lastFetchedTopic = null;
+let lastRenderedTopic = null; // Track the last topic for which videos were rendered
 let lastHomePageState = null; // Track the last homepage state to detect changes
 let lastKnownTopics = []; // Cache the last known topics for fallback rendering
 let lastKnownActiveTopic = ''; // Cache the last known active topic
@@ -21,6 +22,12 @@ let noTopicsMessageContainer = null;
 
 // Flag to track YouTube logo clicks
 let youtubeLogoClicked = false;
+
+// YouTube API key (replace with your actual API key)
+const API_KEY = 'AIzaSyCUWbnQGIlQalfCit_cOfhcXVu3O_qZl-o'; // Replace this with your actual YouTube Data API key
+
+// Cache for fetched videos by topic
+const videoCache = {};
 
 // Debounce function to limit how often handleYouTubePage is called
 function debounce(func, wait) {
@@ -111,6 +118,112 @@ function injectYouDefineButton() {
     document.body.appendChild(youdefinePanel);
     
     setupPanelEventListeners();
+}
+
+// Function to fetch videos from the YouTube Data API
+async function fetchVideos(query) {
+    // Check if videos are already cached
+    if (videoCache[query]) {
+        console.log(`Using cached videos for topic: ${query}`);
+        return videoCache[query];
+    }
+
+    console.log(`Fetching videos for topic: ${query}`);
+    const maxResults = 30;
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${API_KEY}`;
+    
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        const videos = data.items || [];
+        // Cache the videos
+        videoCache[query] = videos;
+        return videos;
+    } catch (error) {
+        console.error('Error fetching videos:', error);
+        return [];
+    }
+}
+
+// Function to render the video grid in the content container
+function renderVideoGrid(videos, topic) {
+    if (!contentContainer) return;
+
+    // Only clear and re-render if the topic has changed
+    if (lastRenderedTopic !== topic) {
+        contentContainer.innerHTML = '';
+
+        if (videos.length === 0) {
+            contentContainer.innerHTML = '<p>No videos found.</p>';
+            return;
+        }
+
+        // Create a grid structure similar to YouTube's homepage
+        const gridRenderer = document.createElement('div');
+        gridRenderer.className = 'ytd-rich-grid-renderer style-scope';
+        gridRenderer.innerHTML = `
+            <div id="contents" class="style-scope ytd-rich-grid-renderer">
+                <div id="content" class="ytd-rich-grid-renderer style-scope">
+                </div>
+            </div>
+        `;
+        const contentDiv = gridRenderer.querySelector('#content');
+
+        videos.forEach(video => {
+            const videoId = video.id.videoId;
+            const title = video.snippet.title;
+            const thumbnail = video.snippet.thumbnails.medium.url;
+            const channelTitle = video.snippet.channelTitle;
+            const publishedAt = video.snippet.publishedAt;
+
+            // Create a video item similar to YouTube's structure
+            const videoItem = document.createElement('div');
+            videoItem.className = 'ytd-rich-item-renderer style-scope';
+            videoItem.innerHTML = `
+                <div id="content" class="ytd-rich-item-renderer style-scope">
+                    <ytd-video-renderer class="style-scope ytd-rich-grid-renderer">
+                        <div id="dismissible" class="style-scope ytd-video-renderer">
+                            <ytd-thumbnail class="style-scope ytd-video-renderer">
+                                <a id="thumbnail" class="yt-simple-endpoint inline-block style-scope ytd-thumbnail" href="/watch?v=${videoId}">
+                                    <img id="img" class="style-scope ytd-thumbnail" src="${thumbnail}" alt="${title}" width="360" height="202">
+                                </a>
+                            </ytd-thumbnail>
+                            <div id="details" class="style-scope ytd-video-renderer">
+                                <div id="meta" class="style-scope ytd-video-renderer">
+                                    <h3 class="style-scope ytd-video-renderer">
+                                        <a id="video-title" class="yt-simple-endpoint style-scope ytd-video-renderer" href="/watch?v=${videoId}">
+                                            ${title}
+                                        </a>
+                                    </h3>
+                                    <div id="metadata" class="style-scope ytd-video-renderer">
+                                        <div id="byline-container" class="style-scope ytd-video-renderer">
+                                            <span id="channel-name" class="style-scope ytd-video-renderer">
+                                                <a class="yt-simple-endpoint style-scope ytd-video-renderer" href="/channel/${video.snippet.channelId}">
+                                                    ${channelTitle}
+                                                </a>
+                                            </span>
+                                        </div>
+                                        <div id="metadata-line" class="style-scope ytd-video-renderer">
+                                            <span class="style-scope ytd-video-renderer">
+                                                ${new Date(publishedAt).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </ytd-video-renderer>
+                </div>
+            `;
+            contentDiv.appendChild(videoItem);
+        });
+
+        contentContainer.appendChild(gridRenderer);
+        lastRenderedTopic = topic;
+    }
 }
 
 // Function to inject all homepage elements with retry mechanism
@@ -419,9 +532,9 @@ function loadStoredSettings() {
                 document.body.classList.remove('has-topics');
             }
 
-            if (activeTopic) {
+            if (activeTopic && activeTopic !== lastFetchedTopic) {
                 setActiveTopic(activeTopic);
-            } else {
+            } else if (!activeTopic && isHomePage) {
                 clearTopicContent();
             }
         });
@@ -461,8 +574,8 @@ function loadStoredSettings() {
     } catch (error) {}
 }
 
-// Add a new topic
-function addTopic(inputElement) {
+// Add a new topic and fetch videos immediately
+async function addTopic(inputElement) {
     const topic = inputElement.value.trim();
     
     inputElement.style.borderColor = '';
@@ -476,10 +589,13 @@ function addTopic(inputElement) {
         return;
     }
     
-    chrome.storage.sync.get(['topics'], function(data) {
+    chrome.storage.sync.get(['topics'], async function(data) {
         const topics = data.topics || [];
         
         if (!topics.includes(topic)) {
+            // Fetch videos for the new topic immediately
+            await fetchVideos(topic);
+            
             topics.push(topic);
             chrome.storage.sync.set({ 'topics': topics }, function() {
                 inputElement.value = '';
@@ -504,6 +620,11 @@ function removeTopic(topicToRemove) {
         
         const updatedTopics = topics.filter(topic => topic !== topicToRemove);
         
+        // Remove the topic from the cache
+        if (videoCache[topicToRemove]) {
+            delete videoCache[topicToRemove];
+        }
+        
         chrome.storage.sync.set({ 'topics': updatedTopics }, function() {
             if (topicToRemove === activeTopic) {
                 chrome.storage.sync.set({ 'activeTopic': '' }, function() {
@@ -516,17 +637,21 @@ function removeTopic(topicToRemove) {
     });
 }
 
-// Set active topic
+// Set active topic and display cached videos
 function setActiveTopic(topic) {
     if (topic === lastFetchedTopic) return;
 
+    lastFetchedTopic = topic;
     chrome.storage.sync.set({ 'activeTopic': topic }, function() {
-        lastFetchedTopic = topic;
         chrome.storage.sync.get(['topics'], function(data) {
             const topics = data.topics || [];
             updateTopicChipsNav(topics, topic);
             if (!topic) {
                 clearTopicContent();
+            } else {
+                // Use cached videos, no fetch here
+                const videos = videoCache[topic] || [];
+                renderVideoGrid(videos, topic);
             }
         });
     });
@@ -937,10 +1062,9 @@ function setupShortsObserver(shortsHandling) {
 
 // Function to clear topic content and restore default YouTube view
 function clearTopicContent() {
-    const container = document.querySelector("ytd-rich-grid-renderer");
-    if (isHomePage && container) {
-        container.style.display = "";
-        container.innerHTML = "";
+    if (contentContainer) {
+        contentContainer.innerHTML = '<p>Select a topic to see videos.</p>';
+        lastRenderedTopic = null;
     }
 }
 
@@ -974,9 +1098,8 @@ function handleYouTubePage() {
                 applySettings(settings || {});
                 
                 if (settings.activeTopic && settings.activeTopic !== lastFetchedTopic) {
-                    lastFetchedTopic = settings.activeTopic;
                     setActiveTopic(settings.activeTopic);
-                } else if (isHomePage) {
+                } else if (isHomePage && !settings.activeTopic) {
                     clearTopicContent();
                 }
             });
@@ -997,28 +1120,39 @@ function handleYouTubePage() {
 }
 
 // Debounced version of handleYouTubePage
-const debouncedHandleYouTubePage = debounce(handleYouTubePage, 30);
+const debouncedHandleYouTubePage = debounce(handleYouTubePage, 300);
 
 // Set up the MutationObserver to handle YouTube SPA navigation
 function setupObserver() {
     const observer = new MutationObserver((mutations) => {
-        window.requestAnimationFrame(() => {
-            let significantChange = false;
-            for (const mutation of mutations) {
-                if (mutation.type === 'childList' && (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0)) {
-                    significantChange = true;
-                    break;
+        let significantChange = false;
+        for (const mutation of mutations) {
+            // Only trigger on specific changes to reduce unnecessary calls
+            if (mutation.type === 'childList' && (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0)) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'YTD-BROWSE') {
+                        significantChange = true;
+                        break;
+                    }
                 }
-                if (mutation.type === 'attributes' && mutation.attributeName === 'page-subtype' && mutation.target.tagName === 'YTD-BROWSE') {
-                    significantChange = true;
-                    break;
+                for (const node of mutation.removedNodes) {
+                    if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'YTD-BROWSE') {
+                        significantChange = true;
+                        break;
+                    }
                 }
             }
+            if (mutation.type === 'attributes' && mutation.attributeName === 'page-subtype' && mutation.target.tagName === 'YTD-BROWSE') {
+                significantChange = true;
+                break;
+            }
+        }
 
-            if (significantChange) {
+        if (significantChange) {
+            window.requestAnimationFrame(() => {
                 debouncedHandleYouTubePage();
-            }
-        });
+            });
+        }
     });
 
     const appElement = document.querySelector('ytd-app');

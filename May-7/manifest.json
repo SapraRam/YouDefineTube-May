@@ -10,7 +10,7 @@
     ],
     "host_permissions": [
         "*://*.youtube.com/*",
-        "*://www.googleapis.com/*"
+        "https://www.googleapis.com/youtube/v3/*"
     ],
     "action": {
         "default_icon": {
