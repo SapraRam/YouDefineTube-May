@@ -21,13 +21,12 @@
     },
     "background": {
         "service_worker": "background.js"
-    },
-    "content_scripts": [
+    },    "content_scripts": [
         {
             "matches": [
                 "*://*.youtube.com/*"
             ],
-            "js": ["content2.js"],
+            "js": ["content.js"],
             "css": ["content.css"],
             "run_at": "document_start"
         }

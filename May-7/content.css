@@ -838,6 +838,7 @@ body.youdefine-hide-comments .reel-comments-panel {
     border-radius: 12px;
     overflow: hidden;
     aspect-ratio: 16 / 9;
+    background-color: #0f0f0f;
 }
 
 .thumbnail {
@@ -886,6 +887,25 @@ body.youdefine-hide-comments .reel-comments-panel {
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Video description */
+.video-description {
+    font-family: 'Roboto', 'Noto', sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--yt-spec-text-secondary, #aaaaaa);
+    margin-top: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+html[dark] .video-description {
+    color: #999;
 }
 
 .metadata {
