@@ -3,33 +3,27 @@
 // Track if we're on the homepage
 let isHomePage = false;
 let lastFetchedTopic = null;
-let lastRenderedTopic = null; // Track the last topic for which videos were rendered
-let lastHomePageState = null; // Track the last homepage state to detect changes
-let lastKnownTopics = []; // Cache the last known topics for fallback rendering
-let lastKnownActiveTopic = ''; // Cache the last known active topic
+let lastRenderedTopic = null;
+let lastHomePageState = null;
+let lastKnownTopics = [];
+let lastKnownActiveTopic = '';
+let youtubeLogoClicked = false;
 
-// Track our custom button and panel
+// Track our custom elements
 let youdefineButton = null;
 let youdefinePanel = null;
 let isPanelVisible = false;
-
-// Track the containers
 let topicInputContainer = null;
 let navMessageContainer = null;
 let contentContainer = null;
 let topicNavContainer = null;
 let noTopicsMessageContainer = null;
 
-// Flag to track YouTube logo clicks
-let youtubeLogoClicked = false;
-
-// YouTube API key (replace with your actual API key)
-const API_KEY = 'AIzaSyCUWbnQGIlQalfCit_cOfhcXVu3O_qZl-o'; // Replace this with your actual YouTube Data API key
-
-// Cache for fetched videos by topic
+// YouTube API key
+const API_KEY = 'AIzaSyDZPrC4WYznFS0Zwt-MNmVLPm5LjdxHtcI';
 const videoCache = {};
 
-// Debounce function to limit how often handleYouTubePage is called
+// Debounce function
 function debounce(func, wait) {
     let timeout;
     return function (...args) {
@@ -38,7 +32,7 @@ function debounce(func, wait) {
     };
 }
 
-// Function to check if we're on the YouTube homepage with retry mechanism
+// Check if we're on the YouTube homepage
 function checkIfHomePage(retryCount = 0, maxRetries = 5) {
     if (window.location.pathname === '/' || window.location.pathname === '/feed/recommended') {
         return true;
@@ -47,38 +41,35 @@ function checkIfHomePage(retryCount = 0, maxRetries = 5) {
     if (browseElement && browseElement.getAttribute('page-subtype') === 'home') {
         return true;
     }
-    // Retry if homepage not detected and retry limit not reached
     if (retryCount < maxRetries) {
         setTimeout(() => checkIfHomePage(retryCount + 1, maxRetries), 50);
     }
     return false;
 }
 
-// Function to inject our custom button next to the Create button
+// Inject custom button
 function injectYouDefineButton() {
     if (document.getElementById('youdefine-button')) return;
-    
+
     const endButtonsContainer = document.querySelector('ytd-masthead #end');
     if (!endButtonsContainer) {
         setTimeout(injectYouDefineButton, 1000);
         return;
     }
-    
+
     youdefineButton = document.createElement('button');
     youdefineButton.id = 'youdefine-button';
     youdefineButton.innerHTML = '<img src="' + chrome.runtime.getURL('images/icon16.png') + '" alt="YouDefineTube"> YouDefineTube';
-    
+
     youdefinePanel = document.createElement('div');
     youdefinePanel.id = 'youdefine-panel';
-    youdefinePanel.innerHTML = `        
+    youdefinePanel.innerHTML = `
         <div class="toggle-container">
             <h3>Display Options</h3>
-            
             <div class="toggle-option">
                 <input type="checkbox" id="hide-shorts-toggle">
                 <label for="hide-shorts-toggle">Hide Shorts</label>
             </div>
-            
             <div class="shorts-options" id="shorts-options" style="display: none; margin-left: 52px; margin-bottom: 10px;">
                 <div class="radio-option">
                     <input type="radio" id="shorts-block" name="shorts-handling" value="block">
@@ -89,40 +80,36 @@ function injectYouDefineButton() {
                     <label for="shorts-convert">Convert shorts to normal videos</label>
                 </div>
             </div>
-            
             <div class="toggle-option">
                 <input type="checkbox" id="hide-sidebar-toggle">
                 <label for="hide-sidebar-toggle">Hide Sidebar</label>
             </div>
-            
             <div class="toggle-option">
                 <input type="checkbox" id="hide-comments-toggle">
                 <label for="hide-comments-toggle">Hide Comments</label>
             </div>
         </div>
     `;
-    
-    youdefineButton.addEventListener('click', function(e) {
+
+    youdefineButton.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
         togglePanel();
     });
-    
+
     const searchContainer = document.querySelector('ytd-masthead #search-container');
     if (searchContainer) {
         endButtonsContainer.insertBefore(youdefineButton, endButtonsContainer.firstChild);
     } else {
         endButtonsContainer.appendChild(youdefineButton);
     }
-    
+
     document.body.appendChild(youdefinePanel);
-    
     setupPanelEventListeners();
 }
 
-// Function to fetch videos from the YouTube Data API
+// Fetch videos from YouTube API
 async function fetchVideos(query) {
-    // Check if videos are already cached
     if (videoCache[query]) {
         console.log(`Using cached videos for topic: ${query}`);
         return videoCache[query];
@@ -130,105 +117,141 @@ async function fetchVideos(query) {
 
     console.log(`Fetching videos for topic: ${query}`);
     const maxResults = 30;
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${API_KEY}`;
-    
+    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&order=relevance&key=${API_KEY}`;
+
     try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        const searchResponse = await fetch(searchUrl);
+        if (!searchResponse.ok) {
+            throw new Error(`HTTP error! status: ${searchResponse.status}`);
         }
-        const data = await response.json();
-        const videos = data.items || [];
-        // Cache the videos
+        const searchData = await searchResponse.json();
+        const videos = searchData.items || [];
         videoCache[query] = videos;
+        
+        // Save the videos to storage to persist them across page reloads
+        saveVideoCacheToStorage(query, videos);
+        
         return videos;
     } catch (error) {
-        console.error('Error fetching videos:', error);
+        console.error(`Error fetching videos for query "${query}":`, error);
         return [];
     }
 }
 
-// Function to render the video grid in the content container
+// Render video grid
 function renderVideoGrid(videos, topic) {
     if (!contentContainer) return;
+    
+    // Don't re-render if the content for this topic is already displayed
+    if (lastRenderedTopic === topic && contentContainer.querySelector('.youdefine-content-grid')) {
+        return;
+    }
+    
+    // Only clear and rebuild when the topic changes
+    contentContainer.innerHTML = '';
 
-    // Only clear and re-render if the topic has changed
-    if (lastRenderedTopic !== topic) {
-        contentContainer.innerHTML = '';
+    if (videos.length === 0) {
+        contentContainer.innerHTML = '<p class="no-videos-message">No videos found for this topic.</p>';
+        return;
+    }
 
-        if (videos.length === 0) {
-            contentContainer.innerHTML = '<p>No videos found.</p>';
-            return;
-        }
+    // Create a header for the topic section
+    const topicHeader = document.createElement('div');
+    topicHeader.className = 'youdefine-topic-header';
+    topicHeader.innerHTML = `<h2>${topic}</h2>`;
+    contentContainer.appendChild(topicHeader);
 
-        // Create a grid structure similar to YouTube's homepage
-        const gridRenderer = document.createElement('div');
-        gridRenderer.className = 'ytd-rich-grid-renderer style-scope';
-        gridRenderer.innerHTML = `
-            <div id="contents" class="style-scope ytd-rich-grid-renderer">
-                <div id="content" class="ytd-rich-grid-renderer style-scope">
-                </div>
-            </div>
-        `;
-        const contentDiv = gridRenderer.querySelector('#content');
-
-        videos.forEach(video => {
+    const gridRenderer = document.createElement('div');
+    gridRenderer.className = 'ytd-rich-grid-renderer youdefine-content-grid';
+    gridRenderer.id = 'youdefine-grid-' + topic.replace(/\s+/g, '-').toLowerCase();
+    
+    videos.forEach(video => {
+        try {
             const videoId = video.id.videoId;
             const title = video.snippet.title;
-            const thumbnail = video.snippet.thumbnails.medium.url;
+            const thumbnail = video.snippet.thumbnails.high ? video.snippet.thumbnails.high.url : 
+                            (video.snippet.thumbnails.medium ? video.snippet.thumbnails.medium.url : 
+                            video.snippet.thumbnails.default.url);
             const channelTitle = video.snippet.channelTitle;
             const publishedAt = video.snippet.publishedAt;
+            const timeAgo = getTimeAgo(new Date(publishedAt));
 
-            // Create a video item similar to YouTube's structure
             const videoItem = document.createElement('div');
-            videoItem.className = 'ytd-rich-item-renderer style-scope';
+            videoItem.className = 'ytd-rich-item-renderer';
             videoItem.innerHTML = `
-                <div id="content" class="ytd-rich-item-renderer style-scope">
-                    <ytd-video-renderer class="style-scope ytd-rich-grid-renderer">
-                        <div id="dismissible" class="style-scope ytd-video-renderer">
-                            <ytd-thumbnail class="style-scope ytd-video-renderer">
-                                <a id="thumbnail" class="yt-simple-endpoint inline-block style-scope ytd-thumbnail" href="/watch?v=${videoId}">
-                                    <img id="img" class="style-scope ytd-thumbnail" src="${thumbnail}" alt="${title}" width="360" height="202">
-                                </a>
-                            </ytd-thumbnail>
-                            <div id="details" class="style-scope ytd-video-renderer">
-                                <div id="meta" class="style-scope ytd-video-renderer">
-                                    <h3 class="style-scope ytd-video-renderer">
-                                        <a id="video-title" class="yt-simple-endpoint style-scope ytd-video-renderer" href="/watch?v=${videoId}">
-                                            ${title}
-                                        </a>
-                                    </h3>
-                                    <div id="metadata" class="style-scope ytd-video-renderer">
-                                        <div id="byline-container" class="style-scope ytd-video-renderer">
-                                            <span id="channel-name" class="style-scope ytd-video-renderer">
-                                                <a class="yt-simple-endpoint style-scope ytd-video-renderer" href="/channel/${video.snippet.channelId}">
-                                                    ${channelTitle}
-                                                </a>
-                                            </span>
-                                        </div>
-                                        <div id="metadata-line" class="style-scope ytd-video-renderer">
-                                            <span class="style-scope ytd-video-renderer">
-                                                ${new Date(publishedAt).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                <div class="ytd-rich-item-content">
+                    <div class="thumbnail-container">
+                        <a href="/watch?v=${videoId}" class="yt-simple-endpoint">
+                            <img class="thumbnail" src="${thumbnail}" alt="${title}" loading="lazy">
+                            <div class="overlay">
+                                <span class="duration-badge">N/A</span>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="details">
+                        <a href="/watch?v=${videoId}" class="video-title-link">
+                            <h3 class="video-title">${title}</h3>
+                        </a>
+                        <div class="metadata">
+                            <a href="/channel/${video.snippet.channelId}" class="channel-link">${channelTitle}</a>
+                            <div class="metadata-stats">
+                                <span class="time-ago">${timeAgo}</span>
                             </div>
                         </div>
-                    </ytd-video-renderer>
+                    </div>
                 </div>
             `;
-            contentDiv.appendChild(videoItem);
-        });
+            gridRenderer.appendChild(videoItem);
+        } catch (err) {
+            console.error('Error rendering video:', err);
+        }
+    });
 
-        contentContainer.appendChild(gridRenderer);
-        lastRenderedTopic = topic;
-    }
+    contentContainer.appendChild(gridRenderer);
+    
+    lastRenderedTopic = topic;
 }
 
-// Function to inject all homepage elements with retry mechanism
+// Helper function to format time ago
+function getTimeAgo(date) {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) {
+        return diffInSeconds + ' seconds ago';
+    }
+    
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) {
+        return diffInMinutes + ' minutes ago';
+    }
+    
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) {
+        return diffInHours + ' hours ago';
+    }
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) {
+        return diffInDays + ' days ago';
+    }
+    
+    const diffInWeeks = Math.floor(diffInDays / 7);
+    if (diffInWeeks < 4) {
+        return diffInWeeks + ' weeks ago';
+    }
+    
+    const diffInMonths = Math.floor(diffInDays / 30);
+    if (diffInMonths < 12) {
+        return diffInMonths + ' months ago';
+    }
+    
+    const diffInYears = Math.floor(diffInDays / 365);
+    return diffInYears + ' years ago';
+}
+
+// Inject homepage elements
 function injectHomePageElements(retryCount = 0, maxRetries = 5) {
-    // Check if we're on the homepage
     isHomePage = checkIfHomePage();
     if (!isHomePage) {
         if (retryCount < maxRetries) {
@@ -245,7 +268,7 @@ function injectHomePageElements(retryCount = 0, maxRetries = 5) {
         return;
     }
 
-    // Inject the topic input container (first div)
+    // Persist topic input container
     if (!document.getElementById('youdefine-topic-input-container')) {
         topicInputContainer = document.createElement('div');
         topicInputContainer.id = 'youdefine-topic-input-container';
@@ -279,20 +302,17 @@ function injectHomePageElements(retryCount = 0, maxRetries = 5) {
         }
     }
 
-    // Inject the nav/message container (second div)
+    // Persist nav/message container
     if (!document.getElementById('youdefine-nav-message-container')) {
         navMessageContainer = document.createElement('div');
         navMessageContainer.id = 'youdefine-nav-message-container';
         navMessageContainer.className = 'youdefine-nav-message-container';
-        
-        // Add the "no topics" message container
+
         noTopicsMessageContainer = document.createElement('div');
         noTopicsMessageContainer.id = 'youdefine-no-topics-message';
         noTopicsMessageContainer.className = 'youdefine-no-topics-message';
-        noTopicsMessageContainer.textContent = 'No topics added yet. Add a topic above to get started!';
         navMessageContainer.appendChild(noTopicsMessageContainer);
 
-        // Add the topic chips nav bar container
         topicNavContainer = document.createElement('div');
         topicNavContainer.id = 'youdefine-topic-nav';
         topicNavContainer.className = 'youdefine-topic-nav';
@@ -301,7 +321,7 @@ function injectHomePageElements(retryCount = 0, maxRetries = 5) {
         primaryContent.insertBefore(navMessageContainer, topicInputContainer.nextSibling);
     }
 
-    // Inject the content container (third div)
+    // Persist content container
     if (!document.getElementById('youdefine-content-container')) {
         contentContainer = document.createElement('div');
         contentContainer.id = 'youdefine-content-container';
@@ -309,13 +329,18 @@ function injectHomePageElements(retryCount = 0, maxRetries = 5) {
         primaryContent.insertBefore(contentContainer, navMessageContainer.nextSibling);
     }
 
-    // Render the nav bar with the last known topics
-    if (lastKnownTopics.length === 0) {
-        document.body.classList.remove('has-topics');
+    // Render nav bar
+    renderTopicChipsNav();
+}
+
+// Render topic chips navigation
+function renderTopicChipsNav() {
+    if (!topicNavContainer || !noTopicsMessageContainer) return;    if (lastKnownTopics.length === 0) {
+        if (document.body) document.body.classList.remove('has-topics');
         noTopicsMessageContainer.style.display = 'block';
         topicNavContainer.style.display = 'none';
     } else {
-        document.body.classList.add('has-topics');
+        if (document.body) document.body.classList.add('has-topics');
         noTopicsMessageContainer.style.display = 'none';
         topicNavContainer.style.display = 'flex';
 
@@ -340,10 +365,6 @@ function injectHomePageElements(retryCount = 0, maxRetries = 5) {
                 const chipName = document.createElement('span');
                 chipName.className = 'chip-name';
                 chipName.textContent = topic;
-                chipName.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    setActiveTopic(topic);
-                });
 
                 const closeBtn = document.createElement('span');
                 closeBtn.className = 'chip-close';
@@ -355,7 +376,13 @@ function injectHomePageElements(retryCount = 0, maxRetries = 5) {
 
                 chip.appendChild(chipName);
                 chip.appendChild(closeBtn);
-                topicNavContainer.appendChild(chip);
+                chip.addEventListener('click', (e) => {
+                    if (e.target !== closeBtn) {
+                        setActiveTopic(topic);
+                    }
+                });
+
+                topicNavContainer.appendChild(chip); // Append to end
             } else {
                 const chip = existingChips.find(c => c.querySelector('.chip-name').textContent === topic);
                 if (chip) {
@@ -370,106 +397,59 @@ function injectHomePageElements(retryCount = 0, maxRetries = 5) {
     }
 }
 
-// Function to update topic chips navigation bar on the homepage (used after storage fetch)
+// Update topic chips navigation
 function updateTopicChipsNav(topics, activeTopic) {
     if (!isHomePage) return;
+
+    lastKnownTopics = topics;
+    lastKnownActiveTopic = activeTopic;
 
     if (!navMessageContainer || !topicNavContainer || !noTopicsMessageContainer) {
         injectHomePageElements();
         return;
-    }
-
-    // Toggle visibility between the message and nav bar
-    if (topics.length === 0) {
-        document.body.classList.remove('has-topics');
+    }    if (topics.length === 0) {
+        if (document.body) document.body.classList.remove('has-topics');
         noTopicsMessageContainer.style.display = 'block';
         topicNavContainer.style.display = 'none';
+        clearTopicContent();
         return;
     } else {
-        document.body.classList.add('has-topics');
+        if (document.body) document.body.classList.add('has-topics');
         noTopicsMessageContainer.style.display = 'none';
         topicNavContainer.style.display = 'flex';
     }
 
-    // Get current chips in the DOM
-    const existingChips = Array.from(topicNavContainer.querySelectorAll('.youdefine-topic-chip'));
-    const existingChipNames = existingChips.map(chip => chip.querySelector('.chip-name').textContent);
+    renderTopicChipsNav();
 
-    // Remove chips that no longer exist in the topics list
-    existingChips.forEach(chip => {
-        const chipName = chip.querySelector('.chip-name').textContent;
-        if (!topics.includes(chipName)) {
-            chip.remove();
-        }
-    });
-
-    // Add or update chips based on the topics list
-    topics.forEach(topic => {
-        if (!existingChipNames.includes(topic)) {
-            // Add new chip
-            const chip = document.createElement('div');
-            chip.className = 'youdefine-topic-chip';
-            if (topic === activeTopic) {
-                chip.classList.add('active-chip');
-            }
-
-            // Create chip content
-            const chipName = document.createElement('span');
-            chipName.className = 'chip-name';
-            chipName.textContent = topic;
-            chipName.addEventListener('click', (e) => {
-                e.stopPropagation();
-                setActiveTopic(topic);
-            });
-
-            // Create close button
-            const closeBtn = document.createElement('span');
-            closeBtn.className = 'chip-close';
-            closeBtn.textContent = '×';
-            closeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                removeTopic(topic);
-            });
-
-            chip.appendChild(chipName);
-            chip.appendChild(closeBtn);
-            topicNavContainer.appendChild(chip);
-        } else {
-            // Update existing chip's active state
-            const chip = existingChips.find(c => c.querySelector('.chip-name').textContent === topic);
-            if (chip) {
-                if (topic === activeTopic) {
-                    chip.classList.add('active-chip');
-                } else {
-                    chip.classList.remove('active-chip');
-                }
-            }
-        }
-    });
-}
-
-// Toggle panel visibility
-function togglePanel() {
-    isPanelVisible = !isPanelVisible;
-    if (isPanelVisible) {
-        youdefinePanel.classList.add('visible');
-        setTimeout(() => {
-            document.addEventListener('click', handleClickOutside);
-        }, 10);
-    } else {
-        youdefinePanel.classList.remove('visible');
-        document.removeEventListener('click', handleClickOutside);
+    if (activeTopic && activeTopic !== lastFetchedTopic) {
+        setActiveTopic(activeTopic);
     }
 }
 
-// Handle clicks outside the panel to close it
-function handleClickOutside(event) {
-    if (youdefinePanel && youdefineButton) {
-        if (!youdefinePanel.contains(event.target) && !youdefineButton.contains(event.target)) {
-            isPanelVisible = false;
+// Toggle panel
+function togglePanel() {
+    isPanelVisible = !isPanelVisible;
+    chrome.storage.sync.set({ 'panelVisible': isPanelVisible }, () => {
+        if (isPanelVisible) {
+            youdefinePanel.classList.add('visible');
+            setTimeout(() => {
+                document.addEventListener('click', handleClickOutside);
+            }, 10);
+        } else {
             youdefinePanel.classList.remove('visible');
             document.removeEventListener('click', handleClickOutside);
         }
+    });
+}
+
+// Handle clicks outside panel
+function handleClickOutside(event) {
+    if (youdefinePanel && youdefineButton && !youdefinePanel.contains(event.target) && !youdefineButton.contains(event.target)) {
+        isPanelVisible = false;
+        chrome.storage.sync.set({ 'panelVisible': isPanelVisible }, () => {
+            youdefinePanel.classList.remove('visible');
+            document.removeEventListener('click', handleClickOutside);
+        });
     }
 }
 
@@ -481,105 +461,114 @@ function setupPanelEventListeners() {
     const shortsOptions = document.getElementById('shorts-options');
     const shortsBlock = document.getElementById('shorts-block');
     const shortsConvert = document.getElementById('shorts-convert');
-    
+
     if (hideShorts) {
-        hideShorts.addEventListener('change', function() {
+        hideShorts.addEventListener('change', function () {
             if (shortsOptions) {
                 shortsOptions.style.display = this.checked ? 'block' : 'none';
             }
             saveDisplaySettings();
         });
     }
-    
-    if (shortsBlock) {
-        shortsBlock.addEventListener('change', saveShortsHandling);
-    }
-    
-    if (shortsConvert) {
-        shortsConvert.addEventListener('change', saveShortsHandling);
-    }
-    
+
+    if (shortsBlock) shortsBlock.addEventListener('change', saveShortsHandling);
+    if (shortsConvert) shortsConvert.addEventListener('change', saveShortsHandling);
     if (hideSidebar) hideSidebar.addEventListener('change', saveDisplaySettings);
     if (hideComments) hideComments.addEventListener('change', saveDisplaySettings);
 }
 
-// Load settings from storage and apply them
-function loadStoredSettings() {
-    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local || !chrome.storage.sync) {
-        return;
-    }
+// Load stored settings
+async function loadStoredSettings() {
+    if (!chrome.storage || !chrome.storage.sync) return;
 
-    try {
-        chrome.storage.sync.get(['topics', 'activeTopic'], function(data) {
-            if (chrome.runtime.lastError) {
-                return;
-            }
+    chrome.storage.sync.get(['topics', 'activeTopic', 'panelVisible'], async function (data) {
+        if (chrome.runtime.lastError) return;
 
-            const topics = data.topics || [];
-            const activeTopic = data.activeTopic || '';
+        const topics = data.topics || [];
+        const activeTopic = data.activeTopic || '';
+        const storedPanelVisible = data.panelVisible || false;
 
-            // Cache the topics and active topic for fallback rendering
-            lastKnownTopics = topics;
-            lastKnownActiveTopic = activeTopic;
+        lastKnownTopics = topics;
+        lastKnownActiveTopic = activeTopic;
 
-            // Update topic chips navigation bar
-            updateTopicChipsNav(topics, activeTopic);
+        updateTopicChipsNav(topics, activeTopic);        if (topics.length > 0) {
+            if (document.body) document.body.classList.add('has-topics');
+        } else {
+            if (document.body) document.body.classList.remove('has-topics');
+        }
 
-            // Set has-topics class immediately
-            if (topics.length > 0) {
-                document.body.classList.add('has-topics');
+        // Only update panel visibility if it was explicitly set
+        if (youdefinePanel && storedPanelVisible !== isPanelVisible) {
+            isPanelVisible = storedPanelVisible;
+            if (isPanelVisible) {
+                youdefinePanel.classList.add('visible');
+                document.addEventListener('click', handleClickOutside);
             } else {
-                document.body.classList.remove('has-topics');
+                youdefinePanel.classList.remove('visible');
+                document.removeEventListener('click', handleClickOutside);
             }
+        }
 
-            if (activeTopic && activeTopic !== lastFetchedTopic) {
-                setActiveTopic(activeTopic);
-            } else if (!activeTopic && isHomePage) {
+        if (isHomePage) {
+            if (activeTopic) {
+                if (activeTopic !== lastFetchedTopic) {
+                    // First check memory cache
+                    if (videoCache[activeTopic]) {
+                        renderVideoGrid(videoCache[activeTopic], activeTopic);
+                        lastFetchedTopic = activeTopic;
+                    } else {
+                        // Then check storage
+                        const storedVideos = await loadVideoCacheFromStorage(activeTopic);
+                        if (storedVideos && storedVideos.length > 0) {
+                            renderVideoGrid(storedVideos, activeTopic);
+                            lastFetchedTopic = activeTopic;
+                        } else {
+                            // Finally, fetch from API
+                            setActiveTopic(activeTopic);
+                        }
+                    }
+                }
+            } else {
                 clearTopicContent();
             }
-        });
-    
-        chrome.storage.sync.get(['hideShorts', 'hideSidebar', 'hideComments', 'shortsHandling'], function(data) {
-            if (chrome.runtime.lastError) {
-                return;
-            }
+        }
+    });
 
-            const hideShorts = document.getElementById('hide-shorts-toggle');
-            const hideSidebar = document.getElementById('hide-sidebar-toggle');
-            const hideComments = document.getElementById('hide-comments-toggle');
-            const shortsOptions = document.getElementById('shorts-options');
-            const shortsBlock = document.getElementById('shorts-block');
-            const shortsConvert = document.getElementById('shorts-convert');
-            
-            if (hideShorts) hideShorts.checked = data.hideShorts || false;
-            if (hideSidebar) hideSidebar.checked = data.hideSidebar || false;
-            if (hideComments) hideComments.checked = data.hideComments || false;
-            
-            if (shortsOptions) {
-                shortsOptions.style.display = data.hideShorts ? 'block' : 'none';
-            }
-            
-            if (shortsBlock && shortsConvert) {
-                const shortsHandling = data.shortsHandling || 'block';
-                shortsBlock.checked = shortsHandling === 'block';
-                shortsConvert.checked = shortsHandling === 'convert';
-            }
-            
-            applySettings(data);
-            
-            if (data.hideShorts) {
-                applyShortsHandling();
-            }
-        });
-    } catch (error) {}
+    chrome.storage.sync.get(['hideShorts', 'hideSidebar', 'hideComments', 'shortsHandling'], function (data) {
+        if (chrome.runtime.lastError) return;
+
+        const hideShorts = document.getElementById('hide-shorts-toggle');
+        const hideSidebar = document.getElementById('hide-sidebar-toggle');
+        const hideComments = document.getElementById('hide-comments-toggle');
+        const shortsOptions = document.getElementById('shorts-options');
+        const shortsBlock = document.getElementById('shorts-block');
+        const shortsConvert = document.getElementById('shorts-convert');
+
+        if (hideShorts) hideShorts.checked = data.hideShorts || false;
+        if (hideSidebar) hideSidebar.checked = data.hideSidebar || false;
+        if (hideComments) hideComments.checked = data.hideComments || false;
+
+        if (shortsOptions) {
+            shortsOptions.style.display = data.hideShorts ? 'block' : 'none';
+        }
+
+        if (shortsBlock && shortsConvert) {
+            const shortsHandling = data.shortsHandling || 'block';
+            shortsBlock.checked = shortsHandling === 'block';
+            shortsConvert.checked = shortsHandling === 'convert';
+        }
+
+        applySettings(data);
+        if (data.hideShorts) applyShortsHandling();
+    });
 }
 
-// Add a new topic and fetch videos immediately
+// Add a new topic
 async function addTopic(inputElement) {
     const topic = inputElement.value.trim();
-    
+
     inputElement.style.borderColor = '';
-    
+
     if (!topic) {
         inputElement.style.borderColor = '#ff0000';
         inputElement.classList.add('shake-animation');
@@ -588,22 +577,17 @@ async function addTopic(inputElement) {
         }, 500);
         return;
     }
-    
-    chrome.storage.sync.get(['topics'], async function(data) {
+
+    chrome.storage.sync.get(['topics'], async function (data) {
         const topics = data.topics || [];
-        
+
         if (!topics.includes(topic)) {
-            // Fetch videos for the new topic immediately
             await fetchVideos(topic);
-            
-            topics.push(topic);
-            chrome.storage.sync.set({ 'topics': topics }, function() {
+            topics.push(topic); // Append to end
+            chrome.storage.sync.set({ 'topics': topics, 'activeTopic': topic }, function () {
                 inputElement.value = '';
                 loadStoredSettings();
-                
-                if (topics.length === 1) {
-                    setActiveTopic(topic);
-                }
+                setActiveTopic(topic);
             });
         } else {
             inputElement.value = '';
@@ -614,44 +598,63 @@ async function addTopic(inputElement) {
 
 // Remove a topic
 function removeTopic(topicToRemove) {
-    chrome.storage.sync.get(['topics', 'activeTopic'], function(data) {
-        const topics = data.topics || [];
+    chrome.storage.sync.get(['topics', 'activeTopic'], function (data) {
+        let topics = data.topics || [];
         const activeTopic = data.activeTopic || '';
-        
-        const updatedTopics = topics.filter(topic => topic !== topicToRemove);
-        
-        // Remove the topic from the cache
+
+        topics = topics.filter(topic => topic !== topicToRemove);
+
         if (videoCache[topicToRemove]) {
             delete videoCache[topicToRemove];
         }
-        
-        chrome.storage.sync.set({ 'topics': updatedTopics }, function() {
-            if (topicToRemove === activeTopic) {
-                chrome.storage.sync.set({ 'activeTopic': '' }, function() {
-                    loadStoredSettings();
-                });
+
+        let newActiveTopic = '';
+        if (topics.length > 0 && topicToRemove === activeTopic) {
+            newActiveTopic = topics[0];
+        }
+    
+        if (topicToRemove === activeTopic && topics.length > 0) {
+            newActiveTopic = topics[0]; // Select first topic
+        }
+
+        chrome.storage.sync.set({ 'topics': topics, 'activeTopic': newActiveTopic }, function () {
+            loadStoredSettings();
+            if (newActiveTopic) {
+                setActiveTopic(newActiveTopic);
             } else {
-                loadStoredSettings();
+                clearTopicContent();
             }
         });
     });
 }
 
-// Set active topic and display cached videos
-function setActiveTopic(topic) {
-    if (topic === lastFetchedTopic) return;
+// Set active topic
+async function setActiveTopic(topic) {
+    if (topic === lastFetchedTopic && videoCache[topic]) {
+        renderVideoGrid(videoCache[topic], topic);
+        return;
+    }
 
     lastFetchedTopic = topic;
-    chrome.storage.sync.set({ 'activeTopic': topic }, function() {
-        chrome.storage.sync.get(['topics'], function(data) {
+    chrome.storage.sync.set({ 'activeTopic': topic }, async function () {
+        chrome.storage.sync.get(['topics'], async function (data) {
             const topics = data.topics || [];
             updateTopicChipsNav(topics, topic);
             if (!topic) {
                 clearTopicContent();
             } else {
-                // Use cached videos, no fetch here
-                const videos = videoCache[topic] || [];
-                renderVideoGrid(videos, topic);
+                let videos = videoCache[topic];
+                
+                // If not in memory cache, try to load from storage
+                if (!videos || videos.length === 0) {
+                    videos = await loadVideoCacheFromStorage(topic);
+                    if (!videos) {
+                        // If not in storage, fetch from API
+                        videos = await fetchVideos(topic);
+                    }
+                }
+                
+                renderVideoGrid(videos || [], topic);
             }
         });
     });
@@ -659,66 +662,40 @@ function setActiveTopic(topic) {
 
 // Save display settings
 function saveDisplaySettings() {
-    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.sync) {
-        return;
-    }
-    
+    if (!chrome.storage || !chrome.storage.sync) return;
+
     const hideShorts = document.getElementById('hide-shorts-toggle')?.checked || false;
     const hideSidebar = document.getElementById('hide-sidebar-toggle')?.checked || false;
     const hideComments = document.getElementById('hide-comments-toggle')?.checked || false;
-    
+
     const settings = {
         'hideShorts': hideShorts,
         'hideSidebar': hideSidebar,
         'hideComments': hideComments
     };
-    
-    try {
-        chrome.storage.sync.get(['shortsHandling'], function(data) {
-            if (chrome.runtime.lastError) {
-                applySettings(settings);
-                if (hideShorts) {
-                    applyShortsHandling();
-                }
-                return;
-            }
-            
-            const shortsHandling = data.shortsHandling || 'block';
-            
-            chrome.storage.sync.set(settings, function() {
-                if (chrome.runtime.lastError) {
-                    return;
-                }
-                
-                applySettings(settings);
-                
-                if (hideShorts) {
-                    applyShortsHandling();
-                }
-            });
-        });
-    } catch (error) {
+
+    chrome.storage.sync.set(settings, function () {
         applySettings(settings);
-        if (hideShorts) {
-            applyShortsHandling();
-        }
-    }
+        if (hideShorts) applyShortsHandling();
+    });
 }
 
-// Apply display settings to the page
+// Apply settings
 function applySettings(settings) {
-    document.body.classList.toggle('youdefine-hide-shorts', settings.hideShorts);
-    if (settings.hideShorts) {
-        hideYouTubeShorts();
-    } else {
-        showYouTubeShorts();
+    if (document.body) {
+        document.body.classList.toggle('youdefine-hide-shorts', settings.hideShorts);
+        if (settings.hideShorts) {
+            hideYouTubeShorts();
+        } else {
+            showYouTubeShorts();
+        }
+
+        document.body.classList.toggle('youdefine-hide-sidebar', settings.hideSidebar);
+        document.body.classList.toggle('youdefine-hide-comments', settings.hideComments);
     }
-    
-    document.body.classList.toggle('youdefine-hide-sidebar', settings.hideSidebar);
-    document.body.classList.toggle('youdefine-hide-comments', settings.hideComments);
 }
 
-// Function to hide YouTube Shorts
+// Hide YouTube Shorts
 function hideYouTubeShorts() {
     const shortsContainers = document.querySelectorAll('ytd-rich-section-renderer, ytd-reel-shelf-renderer');
     shortsContainers.forEach(container => {
@@ -726,94 +703,63 @@ function hideYouTubeShorts() {
             container.style.display = 'none';
         }
     });
-    
-    const shortsEntries = document.querySelectorAll('.yt-simple-endpoint.style-scope.ytd-guide-entry-renderer');
-    shortsEntries.forEach(entry => {
-        if (entry.href && entry.href.includes('/shorts')) {
-            entry.style.display = 'none';
-        }
-    });
-    
-    document.body.classList.add('youdefine-hide-shorts-classes');
+
+    if (document.body) document.body.classList.add('youdefine-hide-shorts-classes');
 }
 
-// Function to show YouTube Shorts
+// Show YouTube Shorts
 function showYouTubeShorts() {
     const shortsContainers = document.querySelectorAll('ytd-rich-section-renderer, ytd-reel-shelf-renderer');
     shortsContainers.forEach(container => {
         container.style.display = '';
     });
-    
-    const shortsEntries = document.querySelectorAll('.yt-simple-endpoint.style-scope.ytd-guide-entry-renderer');
-    shortsEntries.forEach(entry => {
-        if (entry.href && entry.href.includes('/shorts')) {
-            entry.style.display = '';
-        }
-    });
-    
-    document.body.classList.remove('youdefine-hide-shorts-classes');
+
+    if (document.body) document.body.classList.remove('youdefine-hide-shorts-classes');
 }
 
-// Save shorts handling preference
+// Save shorts handling
 function saveShortsHandling() {
     const shortsBlock = document.getElementById('shorts-block');
     const shortsConvert = document.getElementById('shorts-convert');
     const hideShorts = document.getElementById('hide-shorts-toggle');
-    
+
     let shortsHandling = 'block';
     if (shortsConvert && shortsConvert.checked) {
         shortsHandling = 'convert';
     }
-    
-    chrome.storage.sync.set({ 'shortsHandling': shortsHandling }, function() {
+
+    chrome.storage.sync.set({ 'shortsHandling': shortsHandling }, function () {
         if (hideShorts && hideShorts.checked) {
             applyShortsHandling();
         }
     });
 }
 
-// Apply shorts handling based on saved preference
+// Apply shorts handling
 function applyShortsHandling() {
-    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.sync) {
-        processYouTubeShorts('block');
-        return;
-    }
-    
-    try {
-        chrome.storage.sync.get(['hideShorts', 'shortsHandling'], function(data) {
-            if (chrome.runtime.lastError) {
-                processYouTubeShorts('block');
-                return;
-            }
-            
-            if (!data.hideShorts) return;
-            
-            const shortsHandling = data.shortsHandling || 'block';
-            
-            processYouTubeShorts(shortsHandling);
-            
-            if (isShortsUrl(window.location.href)) {
-                handleShortsUrl(shortsHandling);
-            }
-            
-            setupShortsObserver(shortsHandling);
-        });
-    } catch (error) {
-        processYouTubeShorts('block');
-    }
+    chrome.storage.sync.get(['hideShorts', 'shortsHandling'], function (data) {
+        if (!data.hideShorts) return;
+
+        const shortsHandling = data.shortsHandling || 'block';
+        processYouTubeShorts(shortsHandling);
+        if (isShortsUrl(window.location.href)) {
+            handleShortsUrl(shortsHandling);
+        }
+        setupShortsObserver(shortsHandling);
+    });
 }
 
-// Check if URL is a shorts URL
+// Check if URL is shorts
 function isShortsUrl(url) {
     return url.includes('/shorts/');
 }
 
-// Convert shorts URL to standard video URL
+// Convert shorts URL
 function convertShortsToVideoUrl(url) {
     return url.replace('/shorts/', '/watch?v=');
 }
 
-// Handle currently loaded shorts URL
+// Handle shorts URL
 function handleShortsUrl(shortsHandling) {
     if (shortsHandling === 'convert') {
         const videoUrl = convertShortsToVideoUrl(window.location.href);
@@ -825,242 +771,134 @@ function handleShortsUrl(shortsHandling) {
     }
 }
 
-// Process all YouTube shorts elements on the page
+// Process YouTube shorts
 function processYouTubeShorts(shortsHandling) {
-    try {
-        const shortsSelectors = [
-            'ytd-guide-entry-renderer a[href^="/shorts"]',
-            'a[href^="/shorts"]',
-            'ytd-guide-entry-renderer yt-formatted-string:contains("Shorts")',
-            'a[title="Shorts"]',
-        ];
-        
-        const allShortsSelectors = shortsSelectors.join(', ');
-        const shortsElements = document.querySelectorAll(allShortsSelectors);
-        
-        shortsElements.forEach(element => {
-            const tagName = element.tagName ? element.tagName.toUpperCase() : '';
-            if (tagName === 'YTD-GUIDE-ENTRY-RENDERER' || tagName === 'YTD-MINI-GUIDE-ENTRY-RENDERER') {
-                element.style.display = 'none';
-            } else {
-                const entryRenderer = element.closest('ytd-guide-entry-renderer') || 
-                                    element.closest('ytd-mini-guide-entry-renderer');
-                if (entryRenderer) {
-                    entryRenderer.style.display = 'none';
-                }
-            }
-        });
-        
-        const potentialShortsItems = [
-            document.querySelector('#endpoint[href^="/shorts"]'),
-            document.querySelector('a#endpoint[title="Shorts"]'),
-            document.querySelector('#items > ytd-guide-entry-renderer:nth-child(2)'),
-            document.querySelector('[aria-label="Shorts"]'),
-        ];
-        
-        potentialShortsItems.forEach(item => {
-            if (item) {
-                const parent = item.closest('ytd-guide-entry-renderer') || 
-                              item.closest('ytd-mini-guide-entry-renderer');
-                if (parent) {
-                    parent.style.display = 'none';
-                } else {
-                    item.style.display = 'none';
-                }
-            }
-        });
-        
-        document.body.classList.add('youdefine-hide-shorts-nav');
-        
-        const homePageShortsSelectors = [
-            'ytd-rich-section-renderer',
-            'ytd-reel-shelf-renderer',
-            '[is-shorts]',
-            'ytd-shorts',
-            'ytd-shorts-shelf-renderer',
-            'ytd-grid-video-renderer a[href^="/shorts"]',
-            'ytd-compact-video-renderer a[href^="/shorts"]',
-            'ytd-video-renderer a[href^="/shorts"]'
-        ];
-        
-        homePageShortsSelectors.forEach(selector => {
-            try {
-                const elements = document.querySelectorAll(selector);
-                elements.forEach(element => {
-                    const isShortsSection = 
-                        (element.querySelector('a[href^="/shorts"]') !== null) || 
-                        (element.textContent && element.textContent.includes('Shorts')) ||
-                        element.hasAttribute('is-shorts') ||
-                        (element.tagName && element.tagName.toUpperCase() === 'YTD-SHORTS') ||
-                        (element.tagName && element.tagName.toUpperCase() === 'YTD-REEL-ITEM-RENDERER');
-                        
-                    if (isShortsSection) {
-                        if (shortsHandling === 'block') {
-                            element.style.display = 'none';
-                            element.classList.remove('youdefine-converted-short');
-                        } else {
-                            element.style.display = '';
-                            element.classList.add('youdefine-converted-short');
-                            const shortsLinks = element.querySelectorAll('a[href^="/shorts"]');
-                            shortsLinks.forEach(link => {
-                                const originalHref = link.getAttribute('href');
-                                const newHref = originalHref.replace('/shorts/', '/watch?v=');
-                                link.setAttribute('href', newHref);
-                                const shortsLabels = link.querySelectorAll('span, yt-formatted-string');
-                                shortsLabels.forEach(label => {
-                                    if (label.textContent && label.textContent.includes('Shorts')) {
-                                        label.textContent = label.textContent.replace('Shorts', 'Video');
-                                    }
-                                });
-                            });
-                        }
-                    }
-                });
-            } catch (selectorError) {}
-        });
-        
-        const shortsContentElements = [
-            ...document.querySelectorAll('ytd-grid-video-renderer a[href^="/shorts"]'),
-            ...document.querySelectorAll('ytd-compact-video-renderer a[href^="/shorts"]'),
-            ...document.querySelectorAll('ytd-video-renderer a[href^="/shorts"]')
-        ];
-        
-        shortsContentElements.forEach(element => {
-            try {
-                const container = findShortsContainer(element);
-                if (container) {
-                    if (shortsHandling === 'block') {
-                        container.classList.add('youdefine-shorts-blocked');
-                        container.classList.remove('youdefine-converted-short');
-                    } else {
-                        container.classList.remove('youdefine-shorts-blocked');
-                        container.classList.add('youdefine-converted-short');
-                        const links = container.querySelectorAll('a[href^="/shorts"]');
-                        links.forEach(link => {
-                            const originalHref = link.getAttribute('href');
-                            const newHref = originalHref.replace('/shorts/', '/watch?v=');
-                            link.setAttribute('href', newHref);
-                            const shortsLabels = link.querySelectorAll('span, yt-formatted-string');
-                            shortsLabels.forEach(label => {
-                                if (label.textContent && label.textContent.includes('Shorts')) {
-                                    label.textContent = label.textContent.replace('Shorts', 'Video');
-                                }
-                            });
-                        });
-                        const thumbnails = container.querySelectorAll('ytd-thumbnail');
-                        thumbnails.forEach(thumbnail => {
-                            thumbnail.classList.remove('ytd-reel-video-renderer');
-                            const img = thumbnail.querySelector('img');
-                            if (img) {
-                                img.style.borderRadius = '0';
-                            }
-                        });
-                    }
-                }
-            } catch (elementError) {}
-        });
-        
-        try {
-            const shortsCarouselItems = document.querySelectorAll('ytd-reel-video-renderer');
-            shortsCarouselItems.forEach(item => {
-                if (shortsHandling === 'block') {
-                    item.style.display = 'none';
-                    item.classList.remove('youdefine-converted-short');
-                } else {
-                    item.style.display = '';
-                    item.classList.add('youdefine-converted-short');
-                    const videoId = extractVideoIdFromElement(item);
-                    if (videoId) {
-                        const existingOverlay = item.querySelector('.youdefine-convert-overlay');
-                        if (existingOverlay) {
-                            existingOverlay.remove();
-                        }
-                        const overlay = document.createElement('a');
-                        overlay.href = `/watch?v=${videoId}`;
-                        overlay.className = 'youdefine-convert-overlay';
-                        overlay.textContent = 'Watch as normal video';
-                        if (item.style.position !== 'relative' && 
-                            window.getComputedStyle(item).position !== 'relative') {
-                            item.style.position = 'relative';
-                        }
-                        item.appendChild(overlay);
-                    }
-                }
-            });
-        } catch (carouselError) {}
-    } catch (error) {}
-}
-
-// Helper to extract video ID from element
-function extractVideoIdFromElement(element) {
-    const shortsLink = element.querySelector('a[href^="/shorts/"]');
-    if (shortsLink) {
-        const href = shortsLink.getAttribute('href');
-        const match = href.match(/\/shorts\/([a-zA-Z0-9_-]+)/);
-        if (match && match[1]) {
-            return match[1];
-        }
-    }
-    
-    if (element.data && element.data.videoId) {
-        return element.data.videoId;
-    }
-    
-    return null;
-}
-
-// Find the container of a shorts element
-function findShortsContainer(element) {
-    if (element.tagName === 'YTD-RICH-SECTION-RENDERER' || 
-        element.tagName === 'YTD-REEL-SHELF-RENDERER') {
-        return element;
-    }
-    
-    const containers = [
-        'ytd-grid-video-renderer',
-        'ytd-compact-video-renderer',
-        'ytd-video-renderer',
-        'ytd-reel-item-renderer'
+    const shortsSelectors = [
+        'ytd-guide-entry-renderer a[href^="/shorts"]',
+        'a[href^="/shorts"]',
+        'ytd-guide-entry-renderer yt-formatted-string:contains("Shorts")',
+        'a[title="Shorts"]',
     ];
-    
-    for (const selector of containers) {
-        const container = element.closest(selector);
-        if (container) return container;
-    }
-    
-    return null;
+
+    const allShortsSelectors = shortsSelectors.join(', ');
+    const shortsElements = document.querySelectorAll(allShortsSelectors);
+
+    shortsElements.forEach(element => {
+        const tagName = element.tagName ? element.tagName.toUpperCase() : '';
+        if (tagName === 'YTD-GUIDE-ENTRY-RENDERER' || tagName === 'YTD-MINI-GUIDE-ENTRY-RENDERER') {
+            element.style.display = 'none';
+        } else {
+            const entryRenderer = element.closest('ytd-guide-entry-renderer') ||
+                element.closest('ytd-mini-guide-entry-renderer');
+            if (entryRenderer) {
+                entryRenderer.style.display = 'none';
+            }
+        }
+    });
+
+    if (document.body) document.body.classList.add('youdefine-hide-shorts-nav');
+
+    const homePageShortsSelectors = [
+        'ytd-rich-section-renderer',
+        'ytd-reel-shelf-renderer',
+        '[is-shorts]',
+        'ytd-shorts',
+        'ytd-shorts-shelf-renderer',
+        'ytd-grid-video-renderer a[href^="/shorts"]',
+        'ytd-compact-video-renderer a[href^="/shorts"]',
+        'ytd-video-renderer a[href^="/shorts"]'
+    ];
+
+    homePageShortsSelectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+            const isShortsSection =
+                (element.querySelector('a[href^="/shorts"]') !== null) ||
+                (element.textContent && element.textContent.includes('Shorts')) ||
+                element.hasAttribute('is-shorts') ||
+                (element.tagName && element.tagName.toUpperCase() === 'YTD-SHORTS');
+
+            if (isShortsSection) {
+                if (shortsHandling === 'block') {
+                    element.style.display = 'none';
+                    element.classList.remove('youdefine-converted-short');
+                } else {
+                    element.style.display = '';
+                    element.classList.add('youdefine-converted-short');
+                    const shortsLinks = element.querySelectorAll('a[href^="/shorts"]');
+                    shortsLinks.forEach(link => {
+                        const originalHref = link.getAttribute('href');
+                        const newHref = originalHref.replace('/shorts/', '/watch?v=');
+                        link.setAttribute('href', newHref);
+                    });
+                }
+            }
+        });
+    });
 }
 
-// Set up observer to process shorts that appear dynamically
+// Setup shorts observer
 function setupShortsObserver(shortsHandling) {
     const observer = new MutationObserver((mutations) => {
         let shouldProcess = false;
-        
+
         mutations.forEach(mutation => {
             if (mutation.type === 'childList' && mutation.addedNodes.length) {
                 for (const node of mutation.addedNodes) {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        if (node.classList.contains('yt-simple-endpoint')) {
-                            shouldProcess = true;
-                            break;
-                        }
+                    if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('yt-simple-endpoint')) {
+                        shouldProcess = true;
+                        break;
                     }
                 }
             }
         });
-        
+
         if (shouldProcess) {
             processYouTubeShorts(shortsHandling);
         }
     });
-    
+
     observer.observe(document.body, {
         childList: true,
         subtree: true
     });
 }
 
-// Function to clear topic content and restore default YouTube view
+// Save videos to Chrome storage
+function saveVideoCacheToStorage(topic, videos) {
+    if (!chrome.storage || !chrome.storage.local) return;
+    
+    // Create a storage object with the topic as key
+    const storageObj = {};
+    storageObj[`videoCache_${topic}`] = videos;
+    
+    chrome.storage.local.set(storageObj, () => {
+        console.log(`Saved videos for topic "${topic}" to storage`);
+    });
+}
+
+// Load videos from Chrome storage
+function loadVideoCacheFromStorage(topic) {
+    return new Promise((resolve) => {
+        if (!chrome.storage || !chrome.storage.local) {
+            resolve(null);
+            return;
+        }
+        
+        chrome.storage.local.get([`videoCache_${topic}`], (result) => {
+            const videos = result[`videoCache_${topic}`];
+            if (videos && videos.length > 0) {
+                console.log(`Loaded videos for topic "${topic}" from storage`);
+                videoCache[topic] = videos;
+                resolve(videos);
+            } else {
+                resolve(null);
+            }
+        });
+    });
+}
+
+// Clear topic content
 function clearTopicContent() {
     if (contentContainer) {
         contentContainer.innerHTML = '<p>Select a topic to see videos.</p>';
@@ -1068,66 +906,56 @@ function clearTopicContent() {
     }
 }
 
-// Main function to handle YouTube page
-function handleYouTubePage() {
+// Main function
+async function handleYouTubePage() {
     const currentHomePageState = checkIfHomePage();
-    
-    // Always proceed on the homepage, regardless of previous state
     isHomePage = currentHomePageState;
     lastHomePageState = currentHomePageState;
-    
-    if (isHomePage) {
-        // Inject the custom button
-        injectYouDefineButton();
-        
-        // Inject all homepage elements
-        injectHomePageElements();
 
-        // Fetch the latest settings and update the nav bar
+    if (isHomePage) {
+        injectYouDefineButton();
+        injectHomePageElements();
         loadStoredSettings();
     } else {
         injectYouDefineButton();
         loadStoredSettings();
     }
 
-    try {
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.get(['hideShorts', 'hideSidebar', 'hideComments', 'activeTopic'], function(settings) {
-                if (chrome.runtime.lastError) return;
+    if (chrome.storage && chrome.storage.sync) {
+        chrome.storage.sync.get(['hideShorts', 'hideSidebar', 'hideComments', 'activeTopic'], async function (settings) {
+            if (chrome.runtime.lastError) return;
+
+            applySettings(settings || {});
+            if (settings.activeTopic && isHomePage) {
+                const topic = settings.activeTopic;
                 
-                applySettings(settings || {});
-                
-                if (settings.activeTopic && settings.activeTopic !== lastFetchedTopic) {
-                    setActiveTopic(settings.activeTopic);
-                } else if (isHomePage && !settings.activeTopic) {
-                    clearTopicContent();
+                if (videoCache[topic]) {
+                    renderVideoGrid(videoCache[topic], topic);
+                    lastFetchedTopic = topic;
+                } else {
+                    // Try to load from storage first
+                    const storedVideos = await loadVideoCacheFromStorage(topic);
+                    if (storedVideos && storedVideos.length > 0) {
+                        renderVideoGrid(storedVideos, topic);
+                        lastFetchedTopic = topic;
+                    } else if (topic !== lastFetchedTopic) {
+                        setActiveTopic(topic);
+                    }
                 }
-            });
-        } else {
-            applySettings({
-                hideShorts: false,
-                hideSidebar: false,
-                hideComments: false
-            });
-        }
-    } catch (error) {
-        applySettings({
-            hideShorts: false,
-            hideSidebar: false,
-            hideComments: false
+            } else if (isHomePage && !settings.activeTopic) {
+                clearTopicContent();
+            }
         });
     }
 }
 
-// Debounced version of handleYouTubePage
 const debouncedHandleYouTubePage = debounce(handleYouTubePage, 300);
 
-// Set up the MutationObserver to handle YouTube SPA navigation
+// Setup observer
 function setupObserver() {
     const observer = new MutationObserver((mutations) => {
         let significantChange = false;
         for (const mutation of mutations) {
-            // Only trigger on specific changes to reduce unnecessary calls
             if (mutation.type === 'childList' && (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0)) {
                 for (const node of mutation.addedNodes) {
                     if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'YTD-BROWSE') {
@@ -1166,20 +994,17 @@ function setupObserver() {
     } else if (document.body) {
         observer.observe(document.body, { childList: true, subtree: true });
     }
-    
-    // Add specific detection for YouTube logo clicks
+
     setupYouTubeLogoClickDetection();
 }
 
-// Setup YouTube logo click detection
+// Setup logo click detection
 function setupYouTubeLogoClickDetection() {
-    // Watch for YouTube logo clicks
     const logoInterval = setInterval(() => {
         const ytLogo = document.querySelector('ytd-masthead a#logo');
         if (ytLogo) {
             ytLogo.addEventListener('click', () => {
                 youtubeLogoClicked = true;
-                // Trigger handleYouTubePage immediately
                 handleYouTubePage();
             });
             clearInterval(logoInterval);
@@ -1187,33 +1012,53 @@ function setupYouTubeLogoClickDetection() {
     }, 500);
 }
 
-// Initial Check Logic
-if (document.documentElement) {
+// Initialize the extension
+function initializeExtension() {
+    // Ensure all elements and listeners are set up
     handleYouTubePage();
+    setupObserver();
+
+    // Reattach listeners for runtime messages
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.action === 'updateSettings') {
+            handleYouTubePage();
+            loadStoredSettings();
+            sendResponse({ status: "Settings received by content script" });
+        }
+        return true;
+    });
+
+    // Add navigation event listeners
+    window.addEventListener('yt-navigate-start', () => {
+        // Save the current state if we're navigating away from the homepage
+        if (isHomePage && lastKnownActiveTopic && videoCache[lastKnownActiveTopic]) {
+            saveVideoCacheToStorage(lastKnownActiveTopic, videoCache[lastKnownActiveTopic]);
+        }
+    });
+    
+    window.addEventListener('yt-navigate-finish', () => {
+        window.requestAnimationFrame(() => {
+            debouncedHandleYouTubePage();
+        });
+    });
+    
+    // Handle page reload
+    window.addEventListener('beforeunload', () => {
+        // Save the current state on page refresh
+        if (isHomePage && lastKnownActiveTopic && videoCache[lastKnownActiveTopic]) {
+            saveVideoCacheToStorage(lastKnownActiveTopic, videoCache[lastKnownActiveTopic]);
+        }
+    });
+}
+
+// Initial setup
+if (document.documentElement) {
+    initializeExtension();
 }
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        handleYouTubePage();
-        setupObserver();
-    });
+    document.addEventListener('DOMContentLoaded', initializeExtension);
+    window.addEventListener('load', initializeExtension);
 } else {
-    handleYouTubePage();
-    setupObserver();
+    initializeExtension();
 }
-
-window.addEventListener('yt-navigate-start', () => {});
-window.addEventListener('yt-navigate-finish', () => {
-    window.requestAnimationFrame(() => {
-        debouncedHandleYouTubePage();
-    });
-});
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === 'updateSettings') {
-        handleYouTubePage();
-        loadStoredSettings();
-        sendResponse({ status: "Settings received by content script" });
-    }
-    return true;
-});
